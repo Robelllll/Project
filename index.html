@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KeyStrike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<section id="menu" class="screen on">
+  <h1>Key<span>Strike</span><b>!</b></h1>
+  <p class="sub">Type fast. Type clean. Hit harder.</p>
+  <div class="menu">
+    <button id="bAdv">Adventure<small>Cross five realms and win back the Lost Words</small></button>
+    <button id="bSingle" class="alt">Endless mode<small>Fight enemies until you fall</small></button>
+    <button id="bPvp" class="ghost">PvP mode<small>Two players race to type the same word</small></button>
+    <div class="row"><button id="bHow" class="ghost">How to play</button><button id="bHall" class="ghost">Training Hall</button><button id="bSetup" class="ghost">Sprite setup</button></div>
+  </div>
+  <p class="hint">High score: <b id="hs">0</b></p>
+</section>
+
+<section id="game" class="screen">
+  <button class="back">← Menu</button>
+  <div class="hud">
+    <span id="info"></span><span>Score <b id="score">0</b></span><span id="combo"></span>
+  </div>
+  <div class="tbar"><i id="tfill"></i></div>
+  <div class="arena" id="scene">
+    <div class="pn p0" id="pn0">
+      <div class="plate"><h2><span id="n0">Player 1</span></h2><div class="bar"><i id="h0"></i></div><div class="hp" id="t0"></div></div>
+      <div class="inv" id="inv0"></div>
+      <div class="fx" id="f0"></div>
+      <div class="typebox"><div class="word" id="w0"></div><input id="i0" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Player 1 typing box"></div>
+    </div>
+    <div class="pn p1" id="pn1">
+      <div class="plate"><h2><span id="n1">Enemy</span></h2><div class="bar"><i id="h1"></i></div><div class="hp" id="t1"></div><div class="abar" id="abar"><i id="ab"></i></div></div>
+      <div class="inv" id="inv1"></div>
+      <div class="fx" id="f1"></div>
+      <div class="typebox"><div class="word" id="w1"></div><input id="i1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Player 2 typing box"></div>
+    </div>
+  </div>
+  <div id="msg"></div>
+  <div id="tip"></div>
+  <p class="hint" id="help"></p>
+</section>
+
+<section id="howto" class="screen">
+  <button class="back">← Menu</button>
+  <div class="res" id="howtoBox"></div>
+</section>
+
+<section id="hall" class="screen">
+  <button class="back">← Menu</button>
+  <div class="res" id="hallBox"></div>
+</section>
+
+<section id="setup" class="screen">
+  <button class="back" id="bSetupBack">← Menu</button>
+  <div class="res" id="setupBox"></div>
+</section>
+
+<section id="map" class="screen">
+  <button class="back">← Menu</button>
+  <div class="res" id="mapBox"></div>
+</section>
+
+<section id="results" class="screen">
+  <div class="res" id="resBox"></div>
+</section>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
