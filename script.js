@@ -35,7 +35,7 @@ const PATHS = { bg:"", hero:"", enemy:"" };
 // Animated character image. If the file is missing, an emoji is shown instead.
 // List the GIFs whose art ALREADY faces LEFT (as drawn). Everything else is assumed to face right.
 // The game flips each sprite so heroes (left side) face right and enemies (right side) face left.
-const FACES_LEFT = [];
+const FACES_LEFT = ["guard.gif", "guard.png"];   // the guard is drawn with its sword on the left, toward the hero
 // Choices made in the "Sprite setup" screen are saved in the browser and win over the list above
 let FLIPS = {};
 try{ FLIPS = JSON.parse(localStorage.getItem("keystrikeFlips") || "{}"); }catch(e){}
@@ -44,23 +44,29 @@ function fig(file, emoji, onRight = false, alt = ""){
   const name = file.split("/").pop();
   const drawnLeft = FLIPS[name] ?? FACES_LEFT.includes(name);
   const flip = drawnLeft !== onRight ? -1 : 1;
-  return `<img class="fig" style="--flip:${flip}" src="${encodeURI(file)}"${alt ? ` data-alt="${encodeURI(alt)}"` : ""} alt="" onerror="figErr(this,'${emoji}')">`;
+  return `<img class="fig" style="--flip:${flip}" src="${encodeURI(file)}"${[].concat(alt || []).length ? ` data-alt="${[].concat(alt).map(encodeURI).join("|")}"` : ""} alt="" onerror="figErr(this,'${emoji}')">`;
 }
 // Enemy files are looked up in their realm folder first, then in the main folder. Heroes: main folder, then "class/".
 function enemyFig(R, gif, emoji){ return fig(PATHS.enemy + R.folder + "/" + gif, emoji, true, PATHS.enemy + gif); }
 function heroFig(gif, emoji, onRight = false){ return fig(PATHS.hero + gif, emoji, onRight, "class/" + gif); }
 
 function figErr(img, e){
-  if(img.dataset.alt){ const a = img.dataset.alt; delete img.dataset.alt; img.src = a; return; } const s = document.createElement("span"); s.className = "fig fb"; s.textContent = e; img.replaceWith(s); }
+  if(img.dataset.alt){
+    const parts = img.dataset.alt.split("|"), a = parts.shift();
+    if(parts.length) img.dataset.alt = parts.join("|"); else delete img.dataset.alt;
+    img.src = a; return;
+  } const s = document.createElement("span"); s.className = "fig fb"; s.textContent = e; img.replaceWith(s); }
 
 // Restart a CSS animation class (hit, atk, enter)
 function play(el, cls){ el.classList.remove("hit","atk","enter"); void el.offsetWidth; el.classList.add(cls); }
 
+const bgUrl = f => `url("${encodeURI(PATHS.bg + f)}")`;
 function setScene(R, boss){
-  $("scene").style.backgroundImage = `url("${encodeURI(PATHS.bg + (boss ? R.bossImg : R.bgImg))}")`;
+  $("scene").style.backgroundImage = boss ? `${bgUrl(R.bossImg)}, ${bgUrl(R.bgImg)}` : bgUrl(R.bgImg);
 }
-function setBg(R){
-  document.body.style.setProperty("--bgimg", `linear-gradient(rgba(20,12,8,.5),rgba(20,12,8,.5)), url("${encodeURI(PATHS.bg + R.bgImg)}")`);
+function setBg(R, boss){
+  const img = boss ? `${bgUrl(R.bossImg)}, ${bgUrl(R.bgImg)}` : bgUrl(R.bgImg);
+  document.body.style.setProperty("--bgimg", `linear-gradient(rgba(20,12,8,.5),rgba(20,12,8,.5)), ${img}`);
   document.body.style.setProperty("--rc", R.color);
 }
 function clearBg(){ document.body.style.removeProperty("--bgimg"); }
@@ -157,6 +163,27 @@ function bossMove(){
   return "";
 }
 
+// Royal guards stand beside the King. Art: guard.png (static), animated with CSS.
+function guardImg(isNew){
+  const R = REALMS[4];
+  return fig(PATHS.enemy + R.folder + "/guard.gif", "💂", true, [PATHS.enemy + "guard.gif", PATHS.enemy + R.folder + "/guard.png", PATHS.enemy + "guard.png"]).replace('class="fig"', `class="fig guard${isNew ? " in" : ""}"`);
+}
+function renderGuards(summoned){
+  const f = $("f1"); f.querySelectorAll(".guard").forEach(g => g.remove());
+  const n = G.p[1].guards || 0;
+  for(let i = 0; i < n; i++) f.insertAdjacentHTML("afterbegin", guardImg(summoned && i === n - 1));
+}
+// A glowing bubble shows around anyone who has a shield; it shatters when it blocks a hit
+function shieldBreak(i, gold){
+  const el = document.createElement("span"); el.className = "sbreak" + (gold ? " gold" : "");
+  $("f"+i).appendChild(el); setTimeout(() => el.remove(), 500);
+}
+
+function guardDown(){
+  const gs = $("f1").querySelectorAll(".guard"), g = gs[gs.length - 1];
+  if(g){ g.classList.add("dying"); setTimeout(() => renderGuards(false), 450); }
+}
+
 // Boss signature ability, checked at the start of every round
 function bossSig(){
   const b = G.p[1];
@@ -167,33 +194,37 @@ function bossSig(){
     setTimeout(() => { if(G.round === r && !G.busy){ inp.disabled = false; inp.focus(); } }, 1200);
     return "❄️ Flash freeze! Your typing box is frozen for a moment.";
   }
-  if(b.sig === "guard" && b.rounds % 3 === 0 && !b.shield){ b.shield = true; return "🛡️ The royal guard raise a new shield for the king!"; }
+  if(b.sig === "guard" && b.rounds % 3 === 0 && (b.guards || 0) < 2){
+    b.guards = (b.guards || 0) + 1; renderGuards(true); bigPop("SHIELD RAISED!", "gold");
+    const f = $("f1"); f.classList.add("forming"); setTimeout(() => f.classList.remove("forming"), 650);
+    return "💂 A royal guard raises a shield around the king!";
+  }
   return "";
 }
 
 // ---------- Adventure mode ----------
 const REALMS = [
-  {name:"Whispering Forest", folder:"whispering forest", icon:"🌲", color:"#3f6b4f", bgImg:"whispering forest.png", bossImg:"boss_whispering forest.png",
+  {name:"Whispering Forest", folder:"whispering forest", icon:"🌲", color:"#3f6b4f", bgImg:"whispering forest.png", bossImg:"boss_backgrounds/boss_whispering forest.png",
    enemies:["🐗","🐺","🦇","🕷️"], names:["Wild Boar","Wolf","Bat","Spider"], gifs:["boar.gif","wolf.gif","bat.gif","spider.gif"],
    boss:"🌳 Elder Treant", bossIcon:"🌳", bossGif:"treant.gif",
    intro:"Moss-covered trees whisper stolen words. The Elder Treant guards the first Lost Word.",
    words:"leaf moss oak vine fern acorn root bark branch thorn mushroom".split(" ")},
-  {name:"Burning Desert", folder:"burning desert", icon:"🏜️", color:"#a8741a", bgImg:"burning desert.png", bossImg:"boss_burning desert.png",
+  {name:"Burning Desert", folder:"burning desert", icon:"🏜️", color:"#a8741a", bgImg:"burning desert.png", bossImg:"boss_backgrounds/boss_burning desert.png",
    enemies:["🦂","🐍","🐫","🦎"], names:["Scorpion","Snake","Camel","Lizard"], gifs:["scorpion.gif","snake.gif","camel.gif","lizard.gif"],
    boss:"🏺 Sand Pharaoh", bossIcon:"🏺", bossGif:"pharaoh.gif",
    intro:"Heat shimmers over endless dunes. The Sand Pharaoh buried the second Lost Word.",
    words:"dune sand cactus oasis mirage scorpion dust pyramid camel desert".split(" ")},
-  {name:"Frozen Cave", folder:"frozen cave", icon:"❄️", color:"#2f6f86", bgImg:"frozen cave.png", bossImg:"boss_frozen cave.png",
+  {name:"Frozen Cave", folder:"frozen cave", icon:"❄️", color:"#2f6f86", bgImg:"frozen cave.png", bossImg:"boss_backgrounds/boss_frozen cave.png",
    enemies:["🐧","🐻‍❄️","🦊","⛄"], names:["Penguin","Polar Bear","Arctic Fox","Snowman"], gifs:["penguin.gif","polar bear.gif","arctic fox.gif","snowman.gif"],
    boss:"🧊 Frost Giant", bossIcon:"🧊", bossGif:"frost giant.gif",
    intro:"Your breath turns to frost. The Frost Giant has frozen the third Lost Word in ice.",
    words:"ice snow frost glacier chill blizzard crystal freeze icicle winter".split(" ")},
-  {name:"Volcano Keep", folder:"volcano keep", icon:"🌋", color:"#b0432a", bgImg:"volcano keep.webp", bossImg:"boss_volcano keep.png",
+  {name:"Volcano Keep", folder:"volcano keep", icon:"🌋", color:"#b0432a", bgImg:"volcano keep.webp", bossImg:"boss_backgrounds/boss_volcano keep.jpg",
    enemies:["🔥","🪨","😈","🗿"], names:["Fire Sprite","Lava Rock","Fire Demon","Fire Golem"], gifs:["fire.gif","lava rock.gif","fire demon.gif","fire golem.gif"],
    boss:"🐲 Lava Dragon", bossIcon:"🐲", bossGif:"lava dragon.gif",
    intro:"Rivers of lava light the path. The Lava Dragon burns the fourth Lost Word.",
    words:"lava ember flame magma ash volcano smoke inferno spark blaze".split(" ")},
-  {name:"Dark Castle", folder:"dark castle", icon:"🏰", color:"#6a4c93", bgImg:"dark castle.jpeg", bossImg:"boss_dark castle.avif",
+  {name:"Dark Castle", folder:"dark castle", icon:"🏰", color:"#6a4c93", bgImg:"dark castle.jpeg", bossImg:"boss_backgrounds/boss_dark castle.avif",
    enemies:["👻","🧟","🧛","🗿"], names:["Ghost","Zombie","Vampire","Gargoyle"], gifs:["ghost.gif","zombie.gif","vampire.gif","gargoyle.gif"],
    boss:"👑 Medieval King", bossIcon:"👑", bossGif:"medieval king.gif",
    intro:"The Medieval King, the true Word Thief, waits on his throne with the last Lost Word. End this.",
@@ -222,7 +253,7 @@ Object.assign(REALMS[0], {sig:"regrow", sigLabel:"Regrowth", sigTip:"The Elder T
 Object.assign(REALMS[1], {sig:"curse", sigLabel:"Curse", sigTip:"The Sand Pharaoh curses your words: Mirror rounds (type it backwards) happen far more often. They give +50% damage."});
 Object.assign(REALMS[2], {sig:"flash", sigLabel:"Flash Freeze", sigTip:"The Frost Giant freezes your typing box for a moment every 3rd round. Use that time to get ready."});
 Object.assign(REALMS[3], {sig:"phase", sigLabel:"Dragonfire", sigTip:"The Lava Dragon becomes enraged at half HP: it attacks faster and hits harder."});
-Object.assign(REALMS[4], {sig:"guard", sigLabel:"Royal Guard", sigTip:"The Medieval King's guards raise a new shield for him every 3rd round."});
+Object.assign(REALMS[4], {sig:"guard", sigLabel:"Royal Guard", sigTip:"Every 3rd round a royal guard raises a shield around the Medieval King (2 at most). Each shield absorbs one of your hits, and each guard makes the King hit 25% harder."});
 const NODES = {
   fight:{icon:"⚔️", name:"Fight", desc:"A normal enemy. Earn gold."},
   elite:{icon:"💀", name:"Elite", desc:"Tougher enemy. Drops gold and a power-up."},
@@ -328,7 +359,7 @@ function shop(msg = ""){
 
 function fight(kind){
   G.kind = kind; spawn(kind);
-  const R = REALMS[G.realm]; setBg(R);
+  const R = REALMS[G.realm]; setBg(R, kind === "boss");
   show("game"); draw(); nextRound();
 }
 
@@ -472,7 +503,7 @@ function tick(){
 // The enemy strikes on its own when its attack bar fills
 function enemyAttack(){
   const e = G.p[1], T = TRAITS[e.trait || "normal"];
-  let dmg = Math.round((8 + G.level*1.2) * 0.8 * T.dmg * (e.mega ? 1.4 : e.boss ? 1.2 : e.elite ? 1.15 : 1) * (e.enraged ? 1.3 : 1));
+  let dmg = Math.round((8 + G.level*1.2) * 0.8 * T.dmg * (e.mega ? 1.4 : e.boss ? 1.2 : e.elite ? 1.15 : 1) * (e.enraged ? 1.3 : 1) * (1 + 0.25 * (e.guards || 0)));
   if(e.rage){ dmg = Math.round(dmg * 1.3); e.rage = false; }
   G.atk = 0;
   const dealt = hurt(0, dmg);
@@ -518,6 +549,7 @@ function submit(i){
   const dealt = hurt(1-i, dmg);
   let text = dealt ? `${p.name} hits for ${dealt}! (${Math.round(acc*100)}%)` : `${p.name === "You" ? "Your" : p.name + "’s"} hit was blocked by a shield! 🛡️`;
   if(G.mode==="single") G.atk = perfect ? 0 : Math.max(0, G.atk - 1.5);
+  if(!dealt && G.lastBlock === "guard") text = "The guard's shield absorbed your hit!";
   if(perfect){ text = "⭐ PERFECT! " + text; bigPop("PERFECT!", "gold"); }
   if(G.mode==="single" && G.charging && G.p[1].hp > 0){
     if(ratio >= 0.4) text += " ⚡ Slam interrupted!";
@@ -551,8 +583,13 @@ function pop(i, txt, cls){
 
 function hurt(i, dmg){
   const p = G.p[i];
+  if(i === 1 && p.guards > 0){
+    play($("f0"), "atk"); p.guards--; guardDown(); shieldBreak(1, true); G.lastBlock = "guard";
+    pop(i, "💂 guard blocked", "blk"); return 0;
+  }
+  G.lastBlock = "shield";
   play($("f"+i), "hit"); play($("f"+(1-i)), "atk");
-  if(p.shield){ p.shield = false; pop(i, "🛡️ blocked", "blk"); return 0; }
+  if(p.shield){ p.shield = false; shieldBreak(i, false); pop(i, "🛡️ blocked", "blk"); return 0; }
   p.hp = Math.max(0, p.hp - dmg);
   if(i === 1 && p.sig === "phase" && !p.enraged && p.hp > 0 && p.hp <= p.max / 2){
     p.enraged = true; G.atkCd *= 0.65; bigPop("DRAGON ENRAGED!", "red");
@@ -588,6 +625,8 @@ function draw(){
   G.p.forEach((p,i) => {
     const pct = p.hp/p.max*100, h = $("h"+i);
     $("f"+i).classList.toggle("dead", p.hp <= 0);
+    $("f"+i).classList.toggle("shielded", !!p.shield || (p.guards || 0) > 0);
+    $("f"+i).classList.toggle("gshield", !p.shield && (p.guards || 0) > 0);
     h.style.width = pct + "%";
     h.style.backgroundColor = pct > 50 ? "var(--ok)" : pct > 25 ? "var(--warn)" : "var(--bad)";
     $("t"+i).textContent = `${p.hp} / ${p.max} HP${p.shield ? " 🛡️" : ""}${p.bomb ? " 💣" : ""}${p.fury > 0 ? " 🔥" : ""}${p.rage ? " 💢" : ""}${p.poison > 0 ? " ☠️" : ""}`;
@@ -684,6 +723,7 @@ function setup(){
     R.gifs.forEach((g, i) => items.push({file:PATHS.enemy + R.folder + "/" + g, alt:PATHS.enemy + g, emoji:R.enemies[i], right:true, label:R.names[i]}));
     items.push({file:PATHS.enemy + R.folder + "/" + R.bossGif, alt:PATHS.enemy + R.bossGif, emoji:R.bossIcon, right:true, label:R.boss});
   });
+  items.push({file:PATHS.enemy + REALMS[4].folder + "/guard.gif", alt:[PATHS.enemy + "guard.gif", PATHS.enemy + REALMS[4].folder + "/guard.png", PATHS.enemy + "guard.png"], emoji:"💂", right:true, label:"Royal Guard"});
   const draw = () => {
     $("setupBox").innerHTML = `<h2>Sprite facing</h2><p>Heroes must face right. Enemies and bosses must face left. Press Flip on any that face the wrong way. Your choices are saved.</p><div class="sgrid">`
       + items.map((it, i) => `<div class="scell"><div class="sfig">${fig(it.file, it.emoji, it.right, it.alt)}</div><small>${it.label}</small><button data-i="${i}">Flip</button></div>`).join("") + `</div>`;
@@ -734,7 +774,7 @@ function howto(){
     <p><b>Golden words</b> drop power-ups. Press <b>1, 2, 3</b> (or click) to use them: ❄️ Freeze adds time, 💣 Bomb doubles your next hit, 💚 Heal restores HP, 🛡️ Shield blocks a hit.</p>
     <p><b>Combos:</b> 5 hits in a row starts 🔥 Fury (double damage). A 100% accurate word finished fast is a ⭐ Perfect strike.</p>
     <p><b>Twists:</b> 🔄 Mirror words must be typed backwards for bonus damage. 🌫️ Fog hides the letters.</p>
-    <p><b>Bosses</b> start with a shield, use power-ups, and each has a signature ability: the Treant regrows, the Pharaoh curses your words, the Frost Giant freezes your typing box, the Lava Dragon enrages at half HP, and the King summons new shields. When you see ⚠️ SLAM, finish the word fast to interrupt it.</p>
+    <p><b>Bosses</b> start with a shield, use power-ups, and each has a signature ability: the Treant regrows, the Pharaoh curses your words, the Frost Giant freezes your typing box, the Lava Dragon enrages at half HP, and the King's guards raise shields around him. When you see ⚠️ SLAM, finish the word fast to interrupt it.</p>
     <p><b>Adventure:</b> pick a hero, choose your path (fight, elite, campfire, chest, shop), beat each realm's guardian and win back all 5 Lost Words. Finished runs earn Glory to spend in the Training Hall.</p>
     <button id="hwBack">Got it</button>`;
   $("hwBack").onclick = () => show("menu"); show("howto");
@@ -766,3 +806,10 @@ function hall(msg = ""){
 $("bHow").onclick = howto;
 $("bHall").onclick = () => hall();
 try{ if(!localStorage.getItem("keystrikeSeen")) howto(); }catch(e){}
+
+// If dark castle/shield.gif exists, the guards' shield uses that animation (see style.css); otherwise a CSS bubble is drawn
+if(typeof Image !== "undefined"){
+  const probe = new Image();
+  probe.onload = () => document.documentElement.classList.add("hasShieldGif");
+  probe.src = encodeURI(PATHS.enemy + "dark castle/shield.gif");
+}

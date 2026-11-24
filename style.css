@@ -157,3 +157,37 @@ font:400 clamp(24px,4vw,44px) var(--px);color:var(--hi);text-shadow:4px 4px 0 va
 
 .abar{height:12px;border:3px solid var(--ink);background:var(--ink);margin-top:6px}
 .abar i{display:block;height:100%;width:0;background:#ff8a3d}
+
+/* ---- Royal guards (static PNG, animated with CSS) ---- */
+.fig.guard{height:128px;image-rendering:pixelated;margin-right:-30px;animation:guardidle 1s steps(2) infinite}
+.fig.guard.in{animation:guardin .5s steps(5), guardidle 1s .5s steps(2) infinite}
+.fig.guard.dying{animation:guarddie .45s forwards}
+@keyframes guardidle{50%{transform:scaleX(var(--flip,1)) translateY(-4px)}}
+@keyframes guardin{from{transform:scaleX(var(--flip,1)) translateY(-140px);opacity:0}to{transform:scaleX(var(--flip,1))}}
+@keyframes guarddie{to{transform:scaleX(var(--flip,1)) translateY(20px) rotate(70deg);opacity:0}}
+.fig.guard[src*=".gif"]:not(.in):not(.dying){animation:none}
+
+/* ---- Shield bubble ---- */
+.fx.shielded::before,.sbreak{content:"";position:absolute;left:50%;bottom:6px;width:72%;height:90%;transform:translateX(-50%);border-radius:50%;pointer-events:none;z-index:3;
+border:4px solid rgba(120,220,255,.9);background:radial-gradient(circle,rgba(120,220,255,.08) 40%,rgba(120,220,255,.35));box-shadow:inset 0 0 18px rgba(255,255,255,.45),0 0 14px rgba(120,220,255,.7)}
+.fx.shielded::before{animation:shieldpulse 1.2s steps(3) infinite}
+.fx.gshield::before,.sbreak.gold{border-color:rgba(255,210,90,.95);background:radial-gradient(circle,rgba(255,210,90,.08) 40%,rgba(255,210,90,.38));box-shadow:inset 0 0 18px rgba(255,245,200,.5),0 0 14px rgba(255,200,60,.8)}
+.fx.forming::before{animation:form .65s steps(6)}
+.fx.forming .guard{filter:drop-shadow(0 0 8px #ffd25a) brightness(1.3)}
+.sbreak{animation:sbreak .45s steps(5) forwards}
+@keyframes shieldpulse{50%{opacity:.7;transform:translateX(-50%) scale(1.03)}}
+@keyframes form{from{transform:translateX(-50%) scale(.1);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+@keyframes sbreak{to{transform:translateX(-50%) scale(1.4);opacity:0;border-style:dashed}}
+
+/* ---- Guards' shield: animated gold hex shield (dark castle/shield.gif) ---- */
+.hasShieldGif .fx.gshield::before{width:240px;height:240px;bottom:-30px;border:0;border-radius:0;box-shadow:none;animation:none;opacity:.85;
+background:url("dark castle/shield.gif") center/contain no-repeat;image-rendering:pixelated}
+.hasShieldGif .fx.gshield.forming::before{animation:form .65s steps(6)}
+.hasShieldGif .sbreak.gold{width:240px;height:240px;bottom:-30px;border-color:#ffe08a;border-width:6px;background:rgba(255,224,138,.18)}
+
+/* ---- 16:10 battle screen ---- */
+.arena{min-height:0;aspect-ratio:16/10;width:min(100%,calc((100vh - 230px) * 1.6));margin:0 auto}
+.fx{min-height:0;flex:1}
+.fig{height:clamp(110px,27vh,190px)}
+.fig.guard{height:clamp(80px,18vh,128px)}
+.hasShieldGif .fx.gshield::before,.hasShieldGif .sbreak.gold{width:clamp(150px,34vh,240px);height:clamp(150px,34vh,240px)}
