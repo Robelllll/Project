@@ -191,3 +191,42 @@ background:url("dark castle/shield.gif") center/contain no-repeat;image-renderin
 .fig{height:clamp(110px,27vh,190px)}
 .fig.guard{height:clamp(80px,18vh,128px)}
 .hasShieldGif .fx.gshield::before,.hasShieldGif .sbreak.gold{width:clamp(150px,34vh,240px);height:clamp(150px,34vh,240px)}
+
+/* ================= Fixed 1280x800 stage that scales to any window (no page scrolling) ================= */
+html,body{height:100%;overflow:hidden}
+body{display:block;min-height:0;padding:0}
+main{position:absolute;left:50%;top:50%;width:1280px;max-width:none;height:800px;margin:0;
+transform:translate(-50%,-50%) scale(var(--s,1));transform-origin:center}
+.screen.on{display:flex;flex-direction:column;align-items:center;position:absolute;inset:0;padding-top:52px}
+.screen.on::before,.screen.on::after{content:"";flex:1}
+.back{position:absolute;top:8px;left:0;right:0;margin:0 auto;width:max-content}
+.menu{width:440px}
+.res{width:100%}
+#mapBox{max-width:1000px}
+#howtoBox{max-width:1000px}
+#howtoBox p{font-size:22px;margin-bottom:6px}
+#hallBox{max-width:900px}
+#setupBox{max-width:1150px;padding:16px}
+.sgrid{grid-template-columns:repeat(7,1fr);gap:8px}
+.sfig{height:76px}.sfig .fig{height:68px}
+.scell{padding:6px;gap:4px}.scell small{font-size:18px}
+#setupBox p{font-size:22px}
+.choices.cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+
+/* battle screen: exact 16:10 box inside the stage */
+#game.on > :not(.back){width:896px}
+.hud{margin:0 0 6px}
+.tbar{margin-bottom:14px}
+.arena{width:896px;height:560px;aspect-ratio:16/10;min-height:0;margin:0 auto}
+.inv{min-height:52px}
+.fig{height:200px}
+.fig.guard{height:128px}
+.hasShieldGif .fx.gshield::before,.hasShieldGif .sbreak.gold{width:240px;height:240px}
+#msg{height:64px;min-height:0;margin-top:8px;font-size:28px;line-height:1.05;overflow:hidden}
+#help{display:none}
+#tip{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;width:auto;max-width:880px;z-index:30}
+
+/* ---- one clear timer: the top bar is the enemy's attack ---- */
+.tbar{position:relative;height:24px}
+.tbar.enemy i{background:#ff8a3d}
+.tlabel{position:absolute;inset:0;display:grid;place-items:center;font:400 10px var(--px);color:var(--hi);text-shadow:2px 2px 0 var(--ink);pointer-events:none}

@@ -1,21 +1,30 @@
-// Real English words, grouped by difficulty tier
-const T0 = "cat dog sun map fire jump code play bolt rain tree bird moon star ship road door lamp book cake fish hand milk nose rice sand snow wind wolf yard king gold iron lion rock bear boat cold dark east fast hill kite lake mind note open pink ring sing time vote warm zero".split(" ");
-const T1 = "apple bread chair dance eagle flame grape horse island jungle knight lemon magic night ocean piano queen river storm tiger uncle video water yellow zebra anchor bridge candle dragon forest garden hammer jacket letter market orange pencil rabbit silver tunnel wizard window planet rocket shield castle".split(" ");
-const T2 = "keyboard thunder lightning champion computer mountain adventure strategy challenge hurricane precision elephant football birthday umbrella backpack universe airplane notebook treasure survival dinosaur chocolate fireworks bandwidth butterfly crocodile detective evolution fountain gladiator happiness invention kangaroo labyrinth landscape microphone moonlight navigation orchestra passenger question quicksand rainforest sandwich telescope vegetable waterfall wilderness".split(" ");
-T0.push(..."ant ape axe bat bee bus cup egg fan fox gem hat ice jar key log mud nut owl pen pig rug sky toy van web yak zip arch bell bone card cave claw deer drum farm fort frog gate gift hawk helm".split(" "));
-T1.push(..."arrow beach blade bloom brave cabin cloud coral crown fairy feast flute ghost giant glove haste honey jewel knife lance lunar maple mirror noble olive pearl quest raven scout shade spear spice tower trail wheel wings".split(" "));
-T2.push(..."blizzard campfire cathedral creature crossbow dragonfly explorer fireplace harvest hourglass kingdom lantern moonstone nightfall overgrown pyramid quicksilver scarecrow sunrise whirlwind woodland".split(" "));
-const PHRASES = ["the quick fox jumps high","type fast and strike first","a sharp mind beats a fast hand","power flows through the wire","never let your guard down","words are the sharpest blade","one more word one more win","keep calm and keep typing","the dragon sleeps under the hill","silence the storm with speed"];
-const ALL = [...T0, ...T1, ...T2];
-
 const $ = id => document.getElementById(id);
-const show = id => document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+const show = id => { document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id)); autoFit(); };
+
+// ---- Fit everything on any laptop/PC screen: the 1280x800 stage scales to the window,
+// and any screen whose content is still too tall is shrunk to fit (no scrolling) ----
+function fitStage(){
+  const s = Math.min(innerWidth / 1280, innerHeight / 800);
+  document.documentElement.style.setProperty("--s", s);
+}
+function autoFit(){
+  if(typeof document.querySelector !== "function") return;
+  const el = document.querySelector(".screen.on"); if(!el) return;
+  el.style.zoom = 1;
+  const need = el.scrollHeight, have = el.clientHeight;
+  if(need > have + 1) el.style.zoom = Math.max(0.5, have / need);
+}
+if(typeof window !== "undefined" && window.addEventListener){
+  fitStage();
+  window.addEventListener("resize", () => { fitStage(); autoFit(); });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(autoFit);
+}
 const MIN_ACC = 0.6;
 let G = null, raf = 0, recent = [], runId = 0;
 
 // ---------- Feedback ----------
 const spriteCache = {};
-function sprite(e, n = 16){
+function pixelSprite(e, n = 16){
   const key = e + n; if(spriteCache[key]) return spriteCache[key];
   try{
     const c = document.createElement("canvas"); c.width = c.height = n;
@@ -29,8 +38,30 @@ function sprite(e, n = 16){
   }catch(err){ return e; }
 }
 
+// ---- Item icons (your art). emoji -> [animation name, file]. Missing files fall back to the pixel emoji. ----
+const ICONS = {
+  "✨":["gold","golden words.webp"], "🗡":["dmg30","30% damage.webp"], "🪓":["dmg15","15% damage.jpg"],
+  "⏱":["time","time.jpg"], "🔥":["fury","fury scroll.jpg"], "🧪":["potion","red potion.webp"],
+  "🎲":["mystery","mystery.png"], "❄":["freeze","freeze.avif"], "💣":["bomb","bomb.gif"],
+  "🛡":["shield","shield (powerup).jpg"], "💚":["heart","heart.gif"], "❤":["heart","heart.gif"]
+};
+function sprite(e, n = 16){
+  const ic = ICONS[e.replace(/\uFE0F/g, "")];
+  if(!ic) return pixelSprite(e, n);
+  const alts = ["icons/", "powerups/", "shop/"].map(d => encodeURI(d + ic[1])).join("|");
+  return `<img class="spr" data-ico="${ic[0]}" src="${encodeURI(PATHS.icon + ic[1])}" data-alt="${alts}" alt="" onerror="icoErr(this,'${e}')">`;
+}
+function icoErr(img, e){
+  if(img.dataset.alt){
+    const parts = img.dataset.alt.split("|"), a = parts.shift();
+    if(parts.length) img.dataset.alt = parts.join("|"); else delete img.dataset.alt;
+    img.src = a; return;
+  }
+  img.outerHTML = pixelSprite(e);
+}
+
 // Where your image files live. "" = same folder as index.html. Example: hero:"class/"
-const PATHS = { bg:"", hero:"", enemy:"" };
+const PATHS = { bg:"", hero:"", enemy:"", icon:"powerup & shop/" };
 
 // Animated character image. If the file is missing, an emoji is shown instead.
 // List the GIFs whose art ALREADY faces LEFT (as drawn). Everything else is assumed to face right.
@@ -99,20 +130,20 @@ function fresh(list){
   return w;
 }
 
-// Difficulty tier -> challenge
+// Words are themed to the realm. Short and common first, longer later. No long sentences.
 function pick(tier){
-  if(G && G.adv){
-    const R = REALMS[G.realm];
-    if(G.realm >= 2 && Math.random() < 0.3) return fresh(R.phrases);
-    if(Math.random() < 0.5) return fresh(R.words);
+  const g = G || {level:1};
+  const R = g.adv ? REALMS[g.realm] : g.mode === "pvp" ? REALMS[Math.floor(g.round / 3) % REALMS.length] : REALMS[Math.floor((g.level - 1) / 5) % REALMS.length];
+  if(g.adv){
+    // Adventure: each realm gets a bit harder than the last
+    const pools = [R.easy, [...R.easy, ...R.mid], R.mid, [...R.mid, ...R.mid, ...R.hard], [...R.mid, ...R.hard]];
+    if(g.kind === "boss" && Math.random() < 0.3) return fresh(R.easy) + " " + fresh(R.easy);
+    return fresh(pools[g.realm]);
   }
-  if(tier === 0) return fresh(T0);
-  if(tier === 1) return fresh(T1);
-  if(tier === 2) return fresh(T2);
-  // Tier 3 and up: phrases of real words, one more word every tier (max 5)
-  if(Math.random() < 0.5) return fresh(PHRASES);
-  const count = Math.min(2 + (tier - 3), 5);
-  return Array.from({length: count}, () => fresh(ALL)).join(" ");
+  if(tier === 0) return fresh(R.easy);
+  if(tier === 1) return fresh(R.mid);
+  if(tier === 2) return fresh(R.hard);
+  return fresh(R.easy) + " " + fresh(R.mid);
 }
 
 const POWERS = {
@@ -237,22 +268,29 @@ REALMS[3].phrases = ["lava rivers light the cave","embers rise from the keep","t
 REALMS[4].phrases = ["the king guards the last word","shadows walk the empty halls","the old castle never sleeps","break the curse and take the crown"];
 // Enemy personalities (order matches each realm's enemy list)
 const TRAITS = {
-  normal:{cd:1, dmg:1, label:""},
-  fast:{cd:0.7, dmg:0.8, label:"Quick"},
-  heavy:{cd:1.4, dmg:1.6, label:"Heavy"},
-  poison:{cd:1, dmg:0.8, label:"Venom"},
-  drain:{cd:1, dmg:0.8, label:"Drain"}
+  normal:{time:1, dmg:1, label:""},
+  fast:{time:0.8, dmg:0.8, label:"Quick"},
+  heavy:{time:1.3, dmg:1.6, label:"Heavy"},
+  poison:{time:1, dmg:0.9, label:"Venom"},
+  drain:{time:1, dmg:0.9, label:"Drain"}
 };
 REALMS[0].traits = ["heavy","fast","drain","poison"];
 REALMS[1].traits = ["poison","fast","heavy","fast"];
 REALMS[2].traits = ["fast","heavy","fast","drain"];
 REALMS[3].traits = ["fast","heavy","poison","heavy"];
 REALMS[4].traits = ["fast","heavy","drain","heavy"];
+// Themed word lists (easy 3-5 letters, mid 5-7, hard 7-10)
+Object.assign(REALMS[0], {easy:"leaf moss oak vine fern root bark tree wood seed bush twig pine owl fox nest bee deer".split(" "), mid:"acorn branch forest thorns meadow willow cedar clover flower sprout lichen hollow berry".split(" "), hard:"woodland evergreen blossom wildflower mushroom toadstool rainforest treetop".split(" ")});
+Object.assign(REALMS[1], {easy:"sun sand dune heat dust rock camel oasis snake palm hot dry cave tomb sky wind".split(" "), mid:"cactus mirage canyon desert temple pharaoh sphinx caravan sunset thirst ruins".split(" "), hard:"pyramid scorpion sandstone sandstorm wasteland treasure scorching quicksand".split(" ")});
+Object.assign(REALMS[2], {easy:"ice snow cold frost fog wind hail bear fox seal igloo chill sled cave".split(" "), mid:"arctic freeze shiver winter frozen icicle tundra penguin mammoth glacier snowy".split(" "), hard:"blizzard avalanche snowflake snowstorm permafrost frostbite hailstorm".split(" ")});
+Object.assign(REALMS[3], {easy:"lava fire ash heat hot ember smoke rock coal flame burn glow spark".split(" "), mid:"magma crater molten blaze scorch sulfur cinder forge dragon volcano".split(" "), hard:"obsidian eruption inferno fireball wildfire brimstone scorching".split(" ")});
+Object.assign(REALMS[4], {easy:"king gate moat wall bell tower crown ghost bone sword lord duke".split(" "), mid:"shield knight throne dungeon castle banner armor dagger curse guard".split(" "), hard:"kingdom fortress gargoyle skeleton drawbridge sorcerer cathedral".split(" ")});
+
 // Each realm's boss has its own signature ability
 Object.assign(REALMS[0], {sig:"regrow", sigLabel:"Regrowth", sigTip:"The Elder Treant regrows 4% of its HP every round. Don't drag the fight out."});
 Object.assign(REALMS[1], {sig:"curse", sigLabel:"Curse", sigTip:"The Sand Pharaoh curses your words: Mirror rounds (type it backwards) happen far more often. They give +50% damage."});
 Object.assign(REALMS[2], {sig:"flash", sigLabel:"Flash Freeze", sigTip:"The Frost Giant freezes your typing box for a moment every 3rd round. Use that time to get ready."});
-Object.assign(REALMS[3], {sig:"phase", sigLabel:"Dragonfire", sigTip:"The Lava Dragon becomes enraged at half HP: it attacks faster and hits harder."});
+Object.assign(REALMS[3], {sig:"phase", sigLabel:"Dragonfire", sigTip:"The Lava Dragon becomes enraged at half HP: it gives you less time per word and hits harder."});
 Object.assign(REALMS[4], {sig:"guard", sigLabel:"Royal Guard", sigTip:"Every 3rd round a royal guard raises a shield around the Medieval King (2 at most). Each shield absorbs one of your hits, and each guard makes the King hit 25% harder."});
 const NODES = {
   fight:{icon:"⚔️", name:"Fight", desc:"A normal enemy. Earn gold."},
@@ -317,7 +355,7 @@ const SHOP_POOL = [
   {icon:"🔥", name:"Fury scroll: next 2 hits do double", base:35, fn:p => { p.fury = 2; }},
   {icon:"❤️", name:"+15 max HP", base:30, fn:p => { p.max += 15; p.hp += 15; }},
   {icon:"⏱️", name:"+10% time on every word", base:40, fn:() => { G.tbonus += 0.1; }},
-  {icon:"⚔️", name:"+15% damage", base:40, fn:() => { G.dmgmult = Math.min(1.9, G.dmgmult + 0.15); }},
+  {icon:"🪓", name:"+15% damage", base:40, fn:() => { G.dmgmult = Math.min(1.9, G.dmgmult + 0.15); }},
   {icon:"🗡️", name:"+30% damage (rare)", base:75, fn:() => { G.dmgmult = Math.min(1.9, G.dmgmult + 0.3); }},
   {icon:"✨", name:"More golden words", base:35, fn:() => { G.goldy += 0.08; }}
 ];
@@ -403,7 +441,6 @@ function spawn(kind){
   e.elite = kind === "elite"; e.trait = boss ? "normal" : R.traits[k];
   e.sig = boss ? R.sig : ""; e.sigTip = R.sigTip;
   const T = TRAITS[e.trait];
-  G.atk = 0; G.atkCd = Math.max(5, 10 - G.level*0.25) * T.cd * (boss ? 0.85 : 1);
   const label = boss ? R.sigLabel : T.label;
   G.p[1] = e; $("n1").textContent = name + (label ? ` (${label})` : ""); $("pn1").classList.toggle("boss", boss);
   $("f1").innerHTML = enemyFig(R, boss ? R.bossGif : R.gifs[k], boss ? R.bossIcon : R.enemies[k]);
@@ -417,7 +454,7 @@ function start(mode){
   const adv = mode === "adventure"; if(adv) mode = "single";
   runId++;
   clearBg();
-  G = { mode, adv, realm:0, step:0, coins:0, tbonus:0, goldy:0, dmgmult:1, kind:"normal", atk:0, atkCd:10, lastT:0, round:0, level:1, score:0, combo:0, busy:true, word:"", tStart:0, tLimit:0,
+  G = { mode, adv, realm:0, step:0, coins:0, tbonus:0, goldy:0, dmgmult:1, kind:"normal", round:0, level:1, score:0, combo:0, busy:true, word:"", tStart:0, tLimit:0,
         p:[ newPlayer(mode==="pvp"?"Player 1":"You",100),
             mode==="pvp" ? newPlayer("Player 2",100) : newPlayer("Enemy",45) ] };
   if(mode !== "pvp"){
@@ -427,7 +464,7 @@ function start(mode){
   }
   $("n0").textContent = G.p[0].name; $("n1").textContent = G.p[1].name;
   $("f0").innerHTML = heroFig("wizard.gif", "🧙"); if(mode === "pvp") $("f1").innerHTML = heroFig("rogue.gif", "🥷", true);
-  $("abar").style.display = mode==="pvp" ? "none" : "";
+  $("tbar").classList.toggle("enemy", mode !== "pvp"); $("tlabel").textContent = mode === "pvp" ? "TIME" : "ENEMY ATTACK";
   $("pn1").querySelector(".typebox").style.visibility = mode==="pvp" ? "" : "hidden";
   $("help").textContent = mode==="pvp"
     ? "Same word for both. Click your box or press Tab to switch. Press 1–3 in your own box to use a power-up. First clean finish hits."
@@ -443,6 +480,7 @@ function nextRound(){
   G.tLimit = G.mode==="pvp" ? 3 + len*0.6
            : (3 + len*0.55) * Math.max(0.55, 1 - (G.level-1)*0.06);
   G.tLimit *= 1 + G.tbonus;
+  if(G.mode === "single"){ const e = G.p[1]; G.tLimit *= TRAITS[e.trait || "normal"].time * (e.enraged ? 0.8 : 1); }
   G.p.forEach(p => p.locked = false);
   G.busy = false; G.tStart = performance.now(); G.lastT = G.tStart;
   [0,1].forEach(i => { const inp = $("i"+i); inp.value = ""; inp._n = 0; inp.disabled = (G.mode==="single" && i===1); });
@@ -487,32 +525,11 @@ function renderWords(){
 
 function tick(){
   if(!G || G.busy) return;
-  const now = performance.now(), dt = Math.min(0.1, (now - G.lastT) / 1000); G.lastT = now;
-  const left = G.tLimit - (now - G.tStart)/1000;
-  $("tfill").style.width = Math.max(0, left/G.tLimit*100) + "%";
-  if(G.mode==="single"){
-    G.atk += dt;
-    const pct = Math.min(100, G.atk / G.atkCd * 100);
-    $("ab").style.width = pct + "%"; $("ab").style.backgroundColor = pct >= 80 ? "#ff2a1a" : "#ff8a3d";
-    if(G.atk >= G.atkCd){ enemyAttack(); if(G.busy) return; }
-  }
+  const left = G.tLimit - (performance.now() - G.tStart) / 1000, pct = Math.max(0, left / G.tLimit * 100);
+  $("tfill").style.width = pct + "%";
+  $("tfill").style.backgroundColor = pct < 25 ? "#ff2a1a" : "";
   if(left <= 0){ timeout(); return; }
   raf = requestAnimationFrame(tick);
-}
-
-// The enemy strikes on its own when its attack bar fills
-function enemyAttack(){
-  const e = G.p[1], T = TRAITS[e.trait || "normal"];
-  let dmg = Math.round((8 + G.level*1.2) * 0.8 * T.dmg * (e.mega ? 1.4 : e.boss ? 1.2 : e.elite ? 1.15 : 1) * (e.enraged ? 1.3 : 1) * (1 + 0.25 * (e.guards || 0)));
-  if(e.rage){ dmg = Math.round(dmg * 1.3); e.rage = false; }
-  G.atk = 0;
-  const dealt = hurt(0, dmg);
-  let text = dealt ? `${e.name} attacks for ${dealt}!` : `Your shield blocked ${e.name}!`;
-  if(dealt && e.trait === "drain"){ e.hp = Math.min(e.max, e.hp + Math.round(dealt * 0.5)); text += " It drains your life!"; }
-  if(dealt && e.trait === "poison" && G.p[0].poison === 0){ G.p[0].poison = 2; text += " You are poisoned!"; }
-  tip("meter", "Enemies attack on their own when the orange bar under their name fills. Hitting them pushes it back.");
-  if(G.p[0].hp <= 0) return endRound(text, G.p[0]);
-  $("msg").textContent = text; draw();
 }
 
 function grade(i){
@@ -548,7 +565,6 @@ function submit(i){
   if(G.mode==="single"){ G.combo++; G.score += dmg*10 + G.combo*5; }
   const dealt = hurt(1-i, dmg);
   let text = dealt ? `${p.name} hits for ${dealt}! (${Math.round(acc*100)}%)` : `${p.name === "You" ? "Your" : p.name + "’s"} hit was blocked by a shield! 🛡️`;
-  if(G.mode==="single") G.atk = perfect ? 0 : Math.max(0, G.atk - 1.5);
   if(!dealt && G.lastBlock === "guard") text = "The guard's shield absorbed your hit!";
   if(perfect){ text = "⭐ PERFECT! " + text; bigPop("PERFECT!", "gold"); }
   if(G.mode==="single" && G.charging && G.p[1].hp > 0){
@@ -563,11 +579,15 @@ function submit(i){
 
 function missSingle(text){
   G.combo = 0; G.p[0].streak = 0;
-  let dmg = bossDmg();
+  const e = G.p[1], T = TRAITS[e.trait || "normal"];
+  let dmg = Math.round((8 + G.level*1.2) * T.dmg * (e.mega ? 1.4 : e.boss ? 1.2 : e.elite ? 1.15 : 1) * (e.enraged ? 1.3 : 1) * (1 + 0.25 * (e.guards || 0)));
   if(G.charging) dmg = Math.round(dmg * 1.3);
-  if(G.p[1].rage){ dmg = Math.round(dmg * 1.3); G.p[1].rage = false; }
+  if(e.rage){ dmg = Math.round(dmg * 1.3); e.rage = false; }
   const dealt = hurt(0, dmg);
-  endRound(dealt ? text + ` −${dealt} HP` : text + " Your shield blocked it! 🛡️", G.p[0]);
+  let extra = "";
+  if(dealt && e.trait === "drain"){ e.hp = Math.min(e.max, e.hp + Math.round(dealt * 0.5)); extra += " It drains your life!"; }
+  if(dealt && e.trait === "poison" && G.p[0].poison === 0){ G.p[0].poison = 2; extra += " You are poisoned!"; }
+  endRound(dealt ? text + ` −${dealt} HP` + extra : text + " Your shield blocked it! 🛡️", G.p[0]);
 }
 
 function timeout(){
@@ -592,7 +612,7 @@ function hurt(i, dmg){
   if(p.shield){ p.shield = false; shieldBreak(i, false); pop(i, "🛡️ blocked", "blk"); return 0; }
   p.hp = Math.max(0, p.hp - dmg);
   if(i === 1 && p.sig === "phase" && !p.enraged && p.hp > 0 && p.hp <= p.max / 2){
-    p.enraged = true; G.atkCd *= 0.65; bigPop("DRAGON ENRAGED!", "red");
+    p.enraged = true; bigPop("DRAGON ENRAGED!", "red");
   } pop(i, "−" + dmg, "dmg");
   return dmg;
 }
@@ -769,8 +789,8 @@ if(typeof MutationObserver !== "undefined"){
 function howto(){
   try{ localStorage.setItem("keystrikeSeen", "1"); }catch(e){}
   $("howtoBox").innerHTML = `<h2>How to play</h2>
-    <p><b>Type the word</b> on your side before the timer bar runs out. Faster and cleaner typing deals more damage. Under 60% accuracy counts as a miss and the enemy strikes.</p>
-    <p><b>Enemies attack on their own.</b> Watch the orange bar under their name. When it fills, they strike. Clean hits push it back, and a ⭐ Perfect strike resets it. Each enemy has a trait: Quick, Heavy, Venom (poison) or Drain (heals itself).</p>
+    <p><b>Type the word</b> on your side before the bar runs out. Faster and cleaner typing deals more damage. Under 60% accuracy counts as a miss and the enemy strikes.</p>
+    <p><b>The red bar at the top is the enemy's attack.</b> Finish the word before it empties, or the enemy strikes. Each enemy has a trait: <b>Quick</b> gives you less time and hits softer, <b>Heavy</b> gives you more time but hits hard, <b>Venom</b> poisons you, <b>Drain</b> heals itself.</p>
     <p><b>Golden words</b> drop power-ups. Press <b>1, 2, 3</b> (or click) to use them: ❄️ Freeze adds time, 💣 Bomb doubles your next hit, 💚 Heal restores HP, 🛡️ Shield blocks a hit.</p>
     <p><b>Combos:</b> 5 hits in a row starts 🔥 Fury (double damage). A 100% accurate word finished fast is a ⭐ Perfect strike.</p>
     <p><b>Twists:</b> 🔄 Mirror words must be typed backwards for bonus damage. 🌫️ Fog hides the letters.</p>
